@@ -25,43 +25,59 @@ struct Ortho {
     float left, right, bottom, top, near, far;
 };
 
+const int width = 800;
+const int height = 600;
+
 Ortho ortho = {
         -100, 100, -100, 100,-100,100
 };
 
 Perspective perspective = {
-        65, 2, -10, 100
+        65, 2, 10, 2*width
 };
 
 Sight sight = {
-        0,0,-100,0,0,-1,0,1,0
+        0,0,200,0,0,15,0,1,0
 };
 
 vector<Point> v;
 vector<vector<int> > faces;
 int point_count, face_count;
 
-int light_sample = 1;
-int width = 800;
-int height = 600;
+int light_sample = 0;
 bool perspectiveProjection = false;
 bool orthoProjection = true;
 
-int red = rand()%255 + 1;
-int green = rand()%255 + 1;
-int blue = rand()%255 + 1;
+void changeEye(Sight sight);
+
+void changeEye(Sight sight) {
+    gluLookAt(sight.x_eye,sight.y_eye,sight.z_eye,sight.x_centre,sight.y_centre,
+              sight.z_centre,sight.up_x,sight.up_y,sight.up_z);
+}
+
+void changePerspective(Perspective perspective){
+    gluPerspective(perspective.angle,perspective.aspect,perspective.z_near,perspective.z_far);
+}
+
+void changeProjection(Ortho projection){
+    glOrtho(projection.left,projection.right,projection.bottom,projection.top,projection.near, projection.far);
+}
+
+
 void processNormalKeys(unsigned char key, int x, int y);
 void processSpecialKeys(int key, int x, int y);
 void drawScene();
 
 void init(void) {
-    glClearColor(0.3, 0.3, 0.3, 0.0);
+    glClearColor(1, 1, 1, 1);
 
     glEnable(GL_LIGHTING);
 
     glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
 
     glEnable(GL_NORMALIZE);
+    glEnable(GL_COLOR_MATERIAL);
+    glEnable(GL_DEPTH_TEST);
 }
 
 void reshape(int width, int height)
@@ -99,10 +115,16 @@ void display(void)
     glViewport(0, 0, 2*width, 2*height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(-100, 100, -100, 100, -100, 100);
+    if(orthoProjection){
+        changeProjection(ortho);
+    }
+    if(perspectiveProjection){
+        changePerspective(perspective);
+        changeEye(sight);
+    }
     glMatrixMode(GL_MODELVIEW);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    glCullFace(GL_BACK);
     GLfloat material_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, material_diffuse);
 
@@ -110,24 +132,24 @@ void display(void)
     {
         case 1:
         {
-            GLfloat light0_diffuse[] = { 0.4, 0.7, 0.2 };
-            GLfloat light0_direction[] = { 0.0, 0.0, 100.0, 0.0 };
+            GLfloat light0_diffuse[] = { 1, 1, 1 };
+            GLfloat light0_direction[] = { 0.0, 0.0, -10.0, 0.0 };
             glEnable(GL_LIGHT0);
             glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse);
             glLightfv(GL_LIGHT0, GL_POSITION, light0_direction);
             break; }
         case 2:
         {
-            GLfloat light1_diffuse[] = { 0.4, 0.7, 0.2 };
-            GLfloat light1_position[] = { 0.0, 0.0, 1.0, 1.0 };
+            GLfloat light1_diffuse[] = { 1, 1, 1 };
+            GLfloat light1_position[] = { 0.0, 0.0, 10.0, 0.0 };
             glEnable(GL_LIGHT1);
             glLightfv(GL_LIGHT1, GL_DIFFUSE, light1_diffuse);
             glLightfv(GL_LIGHT1, GL_POSITION, light1_position);
             break; }
         case 3:
         {
-            GLfloat light2_diffuse[] = { 0.4, 0.7, 0.2 };
-            GLfloat light2_position[] = { 0.0, 0.0, 1.0, 1.0 };
+            GLfloat light2_diffuse[] = { 1, 1, 0 };
+            GLfloat light2_position[] = { 0.0, 0.0, 1.0, 0.0 };
             glEnable(GL_LIGHT2);
             glLightfv(GL_LIGHT2, GL_DIFFUSE, light2_diffuse);
             glLightfv(GL_LIGHT2, GL_POSITION, light2_position);
@@ -190,18 +212,22 @@ void display(void)
                 glLightf(GL_LIGHT7, GL_QUADRATIC_ATTENUATION, 0.8);
                 break;
             }
+        default:
+            break;
         }
         GLfloat x, y;
         drawScene();
 
-        glDisable(GL_LIGHT0);
-        glDisable(GL_LIGHT1);
-        glDisable(GL_LIGHT2);
-        glDisable(GL_LIGHT3);
-        glDisable(GL_LIGHT4);
-        glDisable(GL_LIGHT5);
-        glDisable(GL_LIGHT6);
-        glDisable(GL_LIGHT7);
+        if(light_sample>0){
+            glDisable(GL_LIGHT0);
+            glDisable(GL_LIGHT1);
+            glDisable(GL_LIGHT2);
+            glDisable(GL_LIGHT3);
+            glDisable(GL_LIGHT4);
+            glDisable(GL_LIGHT5);
+            glDisable(GL_LIGHT6);
+            glDisable(GL_LIGHT7);
+        }
         glutSwapBuffers();
 }
 
@@ -237,18 +263,33 @@ int main(int argc, char** argv)
 }
 
 void drawScene(){
-
+    // todo fix face 31-32-33-34 and its back face
     for (int i = 0; i < face_count; i++)
     {
-        glColor3f(red/255.0, green/255.0, blue/255.0);
-        glBegin(GL_POLYGON);
-        for (int j = 0; j < faces[i].size(); j++)
+        //for (int j = 0; j < faces[i].size(); j++)
+        for (int j = 0; j < 2; j++)
         {
-            glVertex3f(v[faces[i][j]].x, v[faces[i][j]].y, v[faces[i][j]].z);
+            glBegin(GL_POLYGON);
+            float red = (rand()%255 + 1)/255.0;
+            float green = (rand()%255 + 1)/255.0;
+            float blue = (rand()%255 + 1)/255.0;
+            printf("Color: %f, %f, %f \n", red, green, blue);
+//            glColor3f(red, green, blue);
+
+////            for (int j = 0; j < faces[i].size(); j++)
+//        {
+//            glVertex3f(v[faces[i][j]].x, v[faces[i][j]].y, v[faces[i][j]].z);
+//        }
+            if(j==0){
+                glColor3f(1, 0, 0);
+            }else{
+                glColor3f(0,0,1);
+            }
+            glVertex3f(v[faces[i][2*j]].x, v[faces[i][2*j]].y, v[faces[i][2*j]].z);
+            glVertex3f(v[faces[i][2*j+1]].x, v[faces[i][2*j+1]].y, v[faces[i][2*j+1]].z);
+            glVertex3f(v[faces[i][-2*j+2]].x, v[faces[i][-2*j+2]].y, v[faces[i][-2*j+2]].z);
+            glEnd();
         }
-
-
-        glEnd();
     }
 }
 
@@ -415,20 +456,17 @@ void processNormalKeys(unsigned char key, int x, int y) {
             break;
 
         case 114: // r
-            perspective = {
-                    60, 1, -20, 20
-            };
-
-            sight = {
-                    0,0,-30,0,0,0,0,1,0
-            };
-
-            ortho = {
+             ortho = {
                     -100, 100, -100, 100,-100,100
             };
-            red = rand()%255 + 1;
-            green = rand()%255 + 1;
-            blue = rand()%255 + 1;
+
+             perspective = {
+                    65, 2, 10, 2*width
+            };
+
+             sight = {
+                    0,0,200,0,0,15,0,1,0
+            };
             glMatrixMode(GL_MODELVIEW);
             glLoadIdentity();
             glutPostRedisplay();
